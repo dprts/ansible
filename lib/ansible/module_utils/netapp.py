@@ -29,6 +29,7 @@ from ansible.module_utils.urls import open_url
 from ansible.module_utils.api import basic_auth_argument_spec
 
 import re
+from pkg_resources import get_distribution
 
 HAS_NETAPP_LIB = False
 try:
@@ -118,12 +119,14 @@ def setup_ontap_zapi(module, vserver=None):
         server.set_password(password)
         if vserver:
             server.set_vserver(vserver)
-        # Todo : Replace hard-coded values with configurable parameters.
+
         server.set_api_version(*api_version)
         if port:
             server.set_port(int(port))
         else:
             server.set_port(80)
+
+        # Leaving it hard-coded
         server.set_server_type('FILER')
 
         if transport_type:
@@ -131,7 +134,10 @@ def setup_ontap_zapi(module, vserver=None):
         else:
             server.set_transport_type('HTTP')
 
-        server.set_ssl_verification(module.params['verify_ssl'])
+        # PyPI netapp_lib 2015.9.25 and 2016.10.14 can't handle ssl verification
+        if get_distribution('netapp_lib').version not in ['2015.9.25', '2016.10.14']:
+            server.set_ssl_verification(module.params['verify_ssl'])
+
         return server
     else:
         module.fail_json(msg="the python NetApp-Lib module is required")

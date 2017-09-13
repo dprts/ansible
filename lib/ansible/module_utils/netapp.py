@@ -28,6 +28,8 @@ from ansible.module_utils.api import basic_auth_argument_spec
 from ansible.module_utils.urls import open_url
 from ansible.module_utils.api import basic_auth_argument_spec
 
+import re
+
 HAS_NETAPP_LIB = False
 try:
     from netapp_lib.api.zapi import zapi
@@ -76,6 +78,8 @@ def ontap_sf_host_argument_spec():
         hostname=dict(required=True, type='str'),
         username=dict(required=True, type='str', aliases=['user']),
         password=dict(required=True, type='str', aliases=['pass'], no_log=True),
+        api_version=dict(required=False, type='str', default='1.21'),
+        verify_ssl=dict(required=False, type='bool', default=True)
     )
 
 
@@ -95,9 +99,17 @@ def create_sf_connection(module, port=None):
 
 
 def setup_ontap_zapi(module, vserver=None):
-    hostname = module.params['hostname']
     username = module.params['username']
     password = module.params['password']
+    api_version = module.params['api_version'].split('.')
+
+    hostregex = "((\w+):/{,2}){,1}([\w\d\.-]+)(:(\d+)){,1}"
+    r = re.compile(hostregex)
+    m = r.search(module.params['hostname'])
+
+    transport_type = m.group(2)
+    hostname = m.group(3)
+    port = m.group(5)
 
     if HAS_NETAPP_LIB:
         # set up zapi
@@ -107,10 +119,19 @@ def setup_ontap_zapi(module, vserver=None):
         if vserver:
             server.set_vserver(vserver)
         # Todo : Replace hard-coded values with configurable parameters.
-        server.set_api_version(major=1, minor=21)
-        server.set_port(80)
+        server.set_api_version(*api_version)
+        if port:
+            server.set_port(int(port))
+        else:
+            server.set_port(80)
         server.set_server_type('FILER')
-        server.set_transport_type('HTTP')
+
+        if transport_type:
+            server.set_transport_type(transport_type.upper())
+        else:
+            server.set_transport_type('HTTP')
+
+        server.set_ssl_verification(module.params['verify_ssl'])
         return server
     else:
         module.fail_json(msg="the python NetApp-Lib module is required")

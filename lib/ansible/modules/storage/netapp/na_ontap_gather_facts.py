@@ -154,7 +154,10 @@ class NetAppGatherFacts(object):
                 out = out.copy()
                 out.update({unique_key: convert_keys(json.loads(json.dumps(d)))})
             elif isinstance(field, tuple):
-                unique_key = ':'.join([_finditem(d, el) for el in field])
+                try:
+                    unique_key = ':'.join([_finditem(d, el) for el in field])
+                except TypeError as e:
+                    self.module.fail_json(msg="Error calling API %s: %s, params: %s, %s" % (call, to_native(e), field, json.dumps(d)), exception=traceback.format_exc())
                 out = out.copy()
                 out.update({unique_key: convert_keys(json.loads(json.dumps(d)))})
             else:

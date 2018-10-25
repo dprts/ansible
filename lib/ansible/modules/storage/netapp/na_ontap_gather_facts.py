@@ -108,7 +108,10 @@ class NetAppGatherFacts(object):
             result = self.server.invoke_successfully(api_call, enable_tunneling=False)
             return result
         except netapp_utils.zapi.NaApiError as e:
-            self.module.fail_json(msg="Error calling API %s: %s" %
+            if call in ['security-key-manager-query-get-iter', 'security-key-manager-key-get-iter']:
+                return result
+            else:
+                self.module.fail_json(msg="Error calling API %s: %s" %
                                   (call, to_native(e)), exception=traceback.format_exc())
 
     def get_ifgrp_info(self):
@@ -132,6 +135,9 @@ class NetAppGatherFacts(object):
 
     def get_generic_get_iter(self, call, attribute=None, field=None, query=None, children='attributes-list'):
         generic_call = self.call_api(call, query)
+
+        if generic_call is None:
+            return None
 
         if field is None:
             out = []
@@ -196,7 +202,7 @@ class NetAppGatherFacts(object):
         self.netapp_info['volume_info'] = self.get_generic_get_iter(
             'volume-get-iter',
             attribute='volume-attributes',
-            field=('name', 'node', 'aggr-name'),
+            field=('name', 'owning-vserver-name', 'aggr-name'),
             query={'max-records': '1024'}
         )
         self.netapp_info['lun_info'] = self.get_generic_get_iter(
@@ -234,6 +240,7 @@ class NetAppGatherFacts(object):
             field=('node', 'key-id'),
             query={'max-records': '1024'}
         )
+
         self.netapp_info['vserver_info'] = self.get_generic_get_iter(
             'vserver-get-iter',
             attribute='vserver-info',
